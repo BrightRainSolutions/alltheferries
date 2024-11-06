@@ -1,2 +1,2 @@
-# wa-ferry-tracker
+# ALLTHEFERRIES
 Washington State Ferry Tracker
