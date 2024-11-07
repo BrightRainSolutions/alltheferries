@@ -1,25 +1,31 @@
 {
-  "name": "wa-ferry-tracker",
+  "name": "alltheferries",
   "version": "1.0.0",
   "description": "washington state ferry tracker",
   "main": "index.js",
   "scripts": {
-    "start": "http-server"
+    "start": "web-dev-server --node-resolve --open --watch",
+    "build": "copyfiles \"**/*\" -e 'node_modules/**/*' -e 'dist/**/*' -e 'LICENSE' -e 'package.json' -e 'package-lock.json' -e 'README.md' dist"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/BrightRainSolutions/wa-ferry-tracker.git"
+    "url": "git+https://github.com/BrightRainSolutions/alltheferries.git"
   },
   "keywords": [
     "washington state",
     "ferry",
     "map",
-    "real-time"
+    "real-time",
+    "alltheferries"
   ],
   "author": "dp",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/BrightRainSolutions/wa-ferry-tracker/issues"
+    "url": "https://github.com/BrightRainSolutions/alltheferries/issues"
   },
-  "homepage": "https://github.com/BrightRainSolutions/wa-ferry-tracker#readme"
+  "homepage": "https://github.com/BrightRainSolutions/alltheferries#readme",
+  "devDependencies": {
+    "@web/dev-server": "^0.4.6",
+    "copyfiles": "^2.4.1"
+  }
 }
