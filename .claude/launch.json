@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "alltheferries",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["web-dev-server", "--watch", "--port", "8000"],
+      "port": 8000
+    }
+  ]
+}

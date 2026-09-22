@@ -21,6 +21,9 @@ require([
 			showingTerminalInfobox: false,
 			showingOutOfExtentNotification: false,
 			showAbout: false,
+			// both graphics layers must be populated before we can apply ?dock= / ?ferry=
+			initialLoadsRemaining: 2,
+			originalTitle: "",
 			ferriesGraphicsLayer: null,
 			terminalsGraphicsLayer: null,
 			selectedFerryGraphicsLayer: null,
@@ -249,6 +252,7 @@ require([
 			}
 		},
 		mounted() {
+			this.originalTitle = document.title;
 			this.init();
 			this.loaded = true;
 		},
@@ -370,51 +374,18 @@ require([
 								return result.graphic.layer === this.terminalsGraphicsLayer;
 							});
 							if (clickedVessel.length > 0) {
-								let clickedVesselGraphic = clickedVessel[0].graphic;
-								this.showingFerryInfobox = true;
-								this.showingTerminalInfobox = false;
-								// set to selected
-								this.selectedVessel = clickedVesselGraphic;
-								// this is the marker that shows under the selected ferry
-								this.selectedFerryGraphicsLayer.removeAll();
-								this.selectedFerryMarker = new Graphic({
-									geometry: clickedVesselGraphic.geometry,
-									symbol: this.selectedFerryMarkerSymbol
-								});
-								this.selectedFerryGraphicsLayer.graphics.add(this.selectedFerryMarker);
-								// in case we have a terminal already selected
-								this.selectedTerminalGraphicsLayer.removeAll();
-							} 
+								this.selectVessel(clickedVessel[0].graphic);
+							}
 							else if (clickedTerminal.length > 0) {
-								let clickedTerminalGraphic = clickedTerminal[0].graphic;
-								this.showingTerminalInfobox = true;
-								this.showingFerryInfobox = false;
-								// oh man don't hate me but we are just going to tack on the bulletins here
-								clickedTerminalGraphic.bulletins = [];
-								clickedTerminalGraphic.waitTimes = [];
-								// set selected terminal to clicked terminal graphic
-								this.selectedTerminal = clickedTerminalGraphic;
-								this.selectedTerminalGraphicsLayer.removeAll();
-								this.selectedTerminalMarker = new Graphic({
-									geometry: clickedTerminalGraphic.geometry,
-									symbol: this.selectedTerminalMarkerSymbol
-								});
-								this.selectedTerminalGraphicsLayer.graphics.add(this.selectedTerminalMarker);
-								// in case we have a ferry already selected, clear it
-								this.selectedFerryGraphicsLayer.removeAll();
-								// add any bulletins for the selected terminal
-								// note the hack to add the bulletins array required by this function
-								this.getSelectedTerminalBulletins();
-								this.getSelectedTerminalWaitTimes();
+								this.selectTerminal(clickedTerminal[0].graphic);
 							}
 							else {
-								// clear select and info box and show intro box
-								this.showingFerryInfobox = false;
-								this.selectedFerryGraphicsLayer.removeAll();
-								this.showingTerminalInfobox = false;
-								this.selectedTerminalGraphicsLayer.removeAll();
-								this.showingIntrobox = true;
+								this.clearSelection();
 							}
+						}
+						else {
+							// clicked open water, dismiss whatever is selected
+							this.clearSelection();
 						}
 					});
 				});
@@ -434,6 +405,93 @@ require([
 				watchUtils.whenTrue(this.view, "stationary", () => { 
 					this.scaleSymbols(this.view.zoom);
 				  });
+			},
+			selectVessel(graphic) {
+				this.showingFerryInfobox = true;
+				this.showingTerminalInfobox = false;
+				// set to selected
+				this.selectedVessel = graphic;
+				// this is the marker that shows under the selected ferry
+				this.selectedFerryGraphicsLayer.removeAll();
+				this.selectedFerryMarker = new Graphic({
+					geometry: graphic.geometry,
+					symbol: this.selectedFerryMarkerSymbol
+				});
+				this.selectedFerryGraphicsLayer.graphics.add(this.selectedFerryMarker);
+				// in case we have a terminal already selected
+				this.selectedTerminalGraphicsLayer.removeAll();
+				document.title = `MV ${graphic.attributes.VesselName} | All the Ferries`;
+				this.setUrl("ferry", graphic.attributes.VesselName.toLowerCase());
+			},
+			selectTerminal(graphic) {
+				this.showingTerminalInfobox = true;
+				this.showingFerryInfobox = false;
+				// oh man don't hate me but we are just going to tack on the bulletins here
+				graphic.bulletins = [];
+				graphic.waitTimes = [];
+				// set selected terminal to clicked terminal graphic
+				this.selectedTerminal = graphic;
+				this.selectedTerminalGraphicsLayer.removeAll();
+				this.selectedTerminalMarker = new Graphic({
+					geometry: graphic.geometry,
+					symbol: this.selectedTerminalMarkerSymbol
+				});
+				this.selectedTerminalGraphicsLayer.graphics.add(this.selectedTerminalMarker);
+				// in case we have a ferry already selected, clear it
+				this.selectedFerryGraphicsLayer.removeAll();
+				// add any bulletins for the selected terminal
+				// note the hack to add the bulletins array required by this function
+				this.getSelectedTerminalBulletins();
+				this.getSelectedTerminalWaitTimes();
+				document.title = `${graphic.attributes.TerminalName} Ferry Terminal | All the Ferries`;
+				this.setUrl("dock", graphic.attributes.TerminalAbbrev);
+			},
+			clearSelection() {
+				// clear select and info box and show intro box
+				this.showingFerryInfobox = false;
+				this.selectedFerryGraphicsLayer.removeAll();
+				this.showingTerminalInfobox = false;
+				this.selectedTerminalGraphicsLayer.removeAll();
+				this.showingIntrobox = true;
+				document.title = this.originalTitle;
+				this.setUrl();
+			},
+			setUrl(kind, value) {
+				// replaceState rather than pushState: the address bar becomes shareable
+				// without adding history entries, so the back button still leaves the site
+				history.replaceState(null, '', kind ? `/?${kind}=${encodeURIComponent(value)}` : '/');
+			},
+			applyUrlState() {
+				// called once both graphics layers are populated so a shared link
+				// like /?dock=BBI or /?ferry=tacoma lands on that selection
+				// unknown or missing values do nothing
+				const params = new URLSearchParams(location.search);
+				const dock = params.get("dock");
+				const ferry = params.get("ferry");
+				let graphic = null;
+				if (dock) {
+					graphic = this.terminalsGraphicsLayer.graphics.items.find(t => {
+						return t.attributes.TerminalAbbrev.toLowerCase() == dock.toLowerCase();
+					});
+					if (graphic) {
+						this.selectTerminal(graphic);
+					}
+				}
+				else if (ferry) {
+					graphic = this.ferriesGraphicsLayer.graphics.items.find(f => {
+						return f.attributes.VesselName.toLowerCase() == ferry.toLowerCase();
+					});
+					if (graphic) {
+						this.selectVessel(graphic);
+					}
+				}
+				if (graphic) {
+					this.showingIntrobox = false;
+					this.view.goTo({
+						target: graphic,
+						zoom: 12
+					});
+				}
 			},
 			scaleSymbols(currentZoom) {
 				this.currentZoomLevel = currentZoom;
@@ -555,6 +613,11 @@ require([
 
 							this.ferriesGraphicsLayer.graphics.add(ferryGraphic);
 						})
+						// ferries are on the map, apply any ?dock= / ?ferry= once terminals are too
+						this.initialLoadsRemaining--;
+						if (this.initialLoadsRemaining === 0) {
+							this.applyUrlState();
+						}
 					}
 					this.isUpdating = false;
 				});
@@ -607,6 +670,11 @@ require([
 							
 						});
 					});
+					// terminals are on the map, apply any ?dock= / ?ferry= once ferries are too
+					this.initialLoadsRemaining--;
+					if (this.initialLoadsRemaining === 0) {
+						this.applyUrlState();
+					}
 				});
 			},
 			zoomToSelectedFerry() {
